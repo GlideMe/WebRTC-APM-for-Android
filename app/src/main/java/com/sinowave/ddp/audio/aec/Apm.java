@@ -258,6 +258,63 @@ public class Apm {
     private native int ProcessReverseStreamEx(); // 远端数据 // 16K, 16Bits, 单声道， 10ms
     //////////////////////////////////////////////////////////////////
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    //                              Resampler Methods                                             //
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Initialize the resampler with input/output frequencies and channel count.
+     * @param inFreq Input sample rate (e.g., 48000)
+     * @param outFreq Output sample rate (e.g., 16000)
+     * @param numChannels Number of audio channels
+     * @return true if initialization successful
+     */
+    public boolean InitializeReSampler(int inFreq, int outFreq, long numChannels) {
+        return SamplingInit(inFreq, outFreq, numChannels);
+    }
+
+    /**
+     * Reset the resampler with new parameters.
+     */
+    public int ResetReSampler(int inFreq, int outFreq, long numChannels) {
+        return SamplingReset(inFreq, outFreq, numChannels);
+    }
+
+    /**
+     * Reset the resampler if parameters have changed.
+     */
+    public int ResetReSamplerIfNeeded(int inFreq, int outFreq, long numChannels) {
+        return SamplingResetIfNeeded(inFreq, outFreq, numChannels);
+    }
+
+    /**
+     * Push samples through the resampler.
+     * @param samplesIn Input samples
+     * @param lengthIn Number of input samples
+     * @param samplesOut Output buffer for resampled data
+     * @param maxLen Maximum output buffer length
+     * @param outLen Expected output length
+     * @return 0 on success, negative on error
+     */
+    public int BytesPushToReSample(short[] samplesIn, long lengthIn, short[] samplesOut, long maxLen, long outLen) {
+        return SamplingPush(samplesIn, lengthIn, samplesOut, maxLen, outLen);
+    }
+
+    /**
+     * Destroy the resampler and free resources.
+     */
+    public boolean DestroyReSampler() {
+        return SamplingDestroy();
+    }
+
+    // Resampler native methods
+    private native boolean SamplingInit(int inFreq, int outFreq, long numChannels);
+    private native int SamplingReset(int inFreq, int outFreq, long numChannels);
+    private native int SamplingResetIfNeeded(int inFreq, int outFreq, long numChannels);
+    private native int SamplingPush(short[] samplesIn, long lengthIn, short[] samplesOut, long maxLen, long outLen);
+    private native boolean SamplingDestroy();
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
     private boolean _init = false;
 
     private long objData; // do not modify it.

@@ -26,6 +26,7 @@
 #include "webrtc/common_audio/channel_buffer.h"
 #include "webrtc/common_audio/include/audio_util.h"
 #include "webrtc/common.h"
+#include "webrtc/common_audio/resampler/include/resampler.h"
 //#include "webrtc/modules/audio_processing/beamformer/mock_nonlinear_beamformer.h"
 
 #include "com_sinowave_ddp_Apm.h"
@@ -37,6 +38,8 @@
 using namespace std;
 using namespace webrtc;
 
+// Global resampler instance
+static webrtc::Resampler* g_resampler = nullptr;
 
 static void set_ctx(JNIEnv *env, jobject thiz, void *ctx) {
     jclass cls = env->GetObjectClass(thiz);
@@ -411,6 +414,49 @@ private:
         return apm->ProcessReverseStream();
     }
 
+    // Resampler methods
+    static jboolean JNICALL SamplingInit(JNIEnv *env, jobject thiz, jint inFreq, jint outFreq, jlong num_channels) {
+        if (g_resampler != nullptr) {
+            delete g_resampler;
+        }
+        g_resampler = new webrtc::Resampler(inFreq, outFreq, num_channels);
+        return g_resampler != nullptr ? JNI_TRUE : JNI_FALSE;
+    }
+
+    static jint JNICALL SamplingReset(JNIEnv *env, jobject thiz, jint inFreq, jint outFreq, jlong num_channels) {
+        if (g_resampler == nullptr) return -1;
+        return g_resampler->Reset(inFreq, outFreq, num_channels);
+    }
+
+    static jint JNICALL SamplingResetIfNeeded(JNIEnv *env, jobject thiz, jint inFreq, jint outFreq, jlong num_channels) {
+        if (g_resampler == nullptr) return -1;
+        return g_resampler->ResetIfNeeded(inFreq, outFreq, num_channels);
+    }
+
+    static jint JNICALL SamplingPush(JNIEnv *env, jobject thiz, jshortArray samplesIn, jlong lengthIn,
+                                      jshortArray samplesOut, jlong maxLen, jlong outLen) {
+        if (g_resampler == nullptr) return -1;
+
+        size_t len = static_cast<size_t>(outLen);
+        short *input = env->GetShortArrayElements(samplesIn, nullptr);
+        short *output = env->GetShortArrayElements(samplesOut, nullptr);
+
+        int ret = g_resampler->Push(input, lengthIn, output, maxLen, len);
+
+        env->ReleaseShortArrayElements(samplesIn, input, 0);
+        env->ReleaseShortArrayElements(samplesOut, output, 0);
+
+        return ret;
+    }
+
+    static jboolean JNICALL SamplingDestroy(JNIEnv *env, jobject thiz) {
+        if (g_resampler != nullptr) {
+            delete g_resampler;
+            g_resampler = nullptr;
+        }
+        return JNI_TRUE;
+    }
+
 
     static inline JNINativeMethod gMethods[] = {
             { "Create", "(ZZZZZZZ)Z", reinterpret_cast<void*>(&ApmWrapper::Create)},
@@ -440,10 +486,13 @@ private:
             {"nativeCaptureStreamCacheDirectBufferAddress", "(Ljava/nio/ByteBuffer;)I", reinterpret_cast<void*>(&ApmWrapper::nativeCaptureStreamCacheDirectBufferAddress)},
             {"nativeRenderStreamCacheDirectBufferAddress", "(Ljava/nio/ByteBuffer;)I", reinterpret_cast<void*>(&ApmWrapper::nativeRenderStreamCacheDirectBufferAddress)},
             {"ProcessStreamEx", "()I", reinterpret_cast<void*>(&ApmWrapper::ProcessStreamEx)},
-            {"ProcessReverseStreamEx", "()I", reinterpret_cast<void*>(&ApmWrapper::ProcessReverseStreamEx)}
-
-
-
+            {"ProcessReverseStreamEx", "()I", reinterpret_cast<void*>(&ApmWrapper::ProcessReverseStreamEx)},
+            // Resampler methods
+            {"SamplingInit", "(IIJ)Z", reinterpret_cast<void*>(&ApmWrapper::SamplingInit)},
+            {"SamplingReset", "(IIJ)I", reinterpret_cast<void*>(&ApmWrapper::SamplingReset)},
+            {"SamplingResetIfNeeded", "(IIJ)I", reinterpret_cast<void*>(&ApmWrapper::SamplingResetIfNeeded)},
+            {"SamplingPush", "([SJ[SJJ)I", reinterpret_cast<void*>(&ApmWrapper::SamplingPush)},
+            {"SamplingDestroy", "()Z", reinterpret_cast<void*>(&ApmWrapper::SamplingDestroy)}
     };
 
 public:
