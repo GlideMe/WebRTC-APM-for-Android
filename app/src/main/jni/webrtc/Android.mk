@@ -42,7 +42,7 @@ LOCAL_LDLIBS += -latomic
 # This ensures ELF segments are 16KB aligned instead of 4KB
 LOCAL_LDFLAGS += -Wl,-z,max-page-size=16384
 
-LOCAL_CPPFLAGS += -std=c++11
+LOCAL_CPPFLAGS += -std=c++17
 LOCAL_CFLAGS += -DWEBRTC_ANDROID
 LOCAL_CFLAGS += -DWEBRTC_POSIX
 
